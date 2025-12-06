@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sub-Image Splitter</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    canvas {
+      display: none;
+    }
+
+    /* THUMB & CARD */
+    .thumb {
+      object-fit: contain;
+      width: 100%;
+      height: auto;
+      display: block;
+      cursor: pointer;
+    }
+
+    .card {
+      position: relative;
+      display: inline-block;
+      overflow: visible;
+      width: 100%;
+    }
+
+    .hover-wrapper {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .fullImg {
+      width: 100%;
+      height: auto;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 0;
+      transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.32s ease, filter 0.32s ease, box-shadow 0.32s ease;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      pointer-events: none;
+    }
+
+    .download-text {
+      color: white;
+      font-weight: 700;
+      font-size: 1.25rem;
+      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.28s ease, transform 0.28s ease;
+    }
+
+    .card:hover .fullImg {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1.1);
+      filter: brightness(50%);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+    }
+
+    .card:hover .download-text {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* FILE INPUT & DRAG AREA */
+    .file-input-container {
+      width: 100%;
+      position: relative;
+    }
+
+    .file-input {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .file-input:hover+.drop-area {
+      background: linear-gradient(145deg, #e0cfff, #d8b4fe);
+      border-color: #8b5cf6;
+      box-shadow: 0 0 15px rgba(139, 92, 246, 0.3);
+      transition: all 0.3s ease;
+    }
+
+    body.dark-mode .file-input:hover+.drop-area {
+      background: linear-gradient(145deg, #4c51bf, #667eea);
+      border-color: #818cf8;
+      transition: all 0.3s ease;
+    }
+
+    .drop-area {
+      border: 2px dashed #a78bfa;
+      border-radius: 1rem;
+      padding: 4rem 2rem;
+      text-align: center;
+      transition: all 0.3s ease;
+      background: linear-gradient(145deg, #f3e8ff, #ede9fe);
+      color: #6b21a8;
+      font-weight: 600;
+      font-size: 1.1rem;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .drop-area.dragover {
+      background: linear-gradient(145deg, #e0cfff, #d8b4fe);
+      border-color: #8b5cf6;
+      box-shadow: 0 0 15px rgba(139, 92, 246, 0.3);
+    }
+
+    /* GRID ORIGINAL */
+    #rowsContainer {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.25rem;
+      margin-top: 1rem;
+    }
+
+    /* LOADING */
+    .loading {
+      display: none;
+      padding: 1.75rem 1.5rem;
+      background: #fff;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      border-radius: 0.75rem;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+      text-align: center;
+      font-weight: 600;
+      font-size: 1rem;
+      color: #374151;
+      width: 100%;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .spinner {
+      width: 34px;
+      height: 34px;
+      border: 4px solid rgba(79, 70, 229, 0.18);
+      border-top-color: #4f46e5;
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* DARK MODE */
+    body.dark-mode {
+      background-color: #1a202c;
+      color: #e2e8f0;
+    }
+
+    body.dark-mode .drop-area {
+      background: linear-gradient(145deg, #2d3748, #4a5568);
+      border-color: #6366f1;
+      color: #e2e8f0;
+    }
+
+    body.dark-mode .drop-area.dragover {
+      background: linear-gradient(145deg, #4c51bf, #667eea);
+      border-color: #818cf8;
+    }
+
+    body.dark-mode .card {
+      background-color: #2d3748;
+    }
+
+    body.dark-mode .download-text {
+      color: #f7fafc;
+      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+    }
+
+    body.dark-mode .loading {
+      background-color: #2d3748;
+      color: #e2e8f0;
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    body.dark-mode .max-w-6xl {
+      background-color: #2d3748;
+      color: #e2e8f0;
+    }
+
+    body.dark-mode .text-gray-800 {
+      color: #e2e8f0;
+    }
+
+    body.dark-mode .bg-white {
+      background-color: #2d3748;
+    }
+
+    #darkModeToggle {
+      background-color: #e2e8f0;
+      color: #4a5568;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    body.dark-mode #darkModeToggle {
+      background-color: #4a5568;
+      color: #e2e8f0;
+    }
+  </style>
+</head>
+
+<body class="bg-gray-100 min-h-screen p-6">
+  <div class="max-w-6xl mx-auto bg-white p-6 rounded-xl shadow-lg flex flex-col gap-4">
+    <div class="flex justify-between items-center">
+      <h1 class="text-2xl font-bold text-gray-800">Sub-Image Splitter</h1>
+      <button id="darkModeToggle"
+        class="p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 sun-icon" fill="none" viewBox="0 0 24 24"
+          stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 moon-icon hidden" fill="none" viewBox="0 0 24 24"
+          stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- DRAG & DROP AREA -->
+    <div class="file-input-container">
+      <input id="imgInput" type="file" accept="image/*" class="file-input" />
+      <label id="dropArea" class="drop-area">
+        <span>Drag & Drop your image here</span>
+        <span>or click to select</span>
+      </label>
+    </div>
+
+    <!-- LOADING -->
+    <div id="loadingIndicator" class="loading">
+      <div class="spinner"></div>Processing image...
+    </div>
+
+    <!-- GRID ORIGINAL -->
+    <div id="rowsContainer"></div>
+  </div>
+
+  <script>
+    const imgInput = document.getElementById('imgInput')
+    const dropArea = document.getElementById('dropArea')
+    const rowsContainer = document.getElementById('rowsContainer')
+    const loading = document.getElementById('loadingIndicator')
+    let worker
+
+    /* Drag & Drop */
+    dropArea.addEventListener('dragover', (e) => {
+      e.preventDefault()
+      dropArea.classList.add('dragover')
+    })
+    dropArea.addEventListener('dragleave', () => dropArea.classList.remove('dragover'))
+    dropArea.addEventListener('drop', (e) => {
+      e.preventDefault()
+      dropArea.classList.remove('dragover')
+      const file = e.dataTransfer.files[0]
+      if (file) {
+        imgInput.files = e.dataTransfer.files
+        handleImage(file)
+      }
+    })
+
+    imgInput.addEventListener('change', () => {
+      const file = imgInput.files[0]
+      if (file) handleImage(file)
+    })
+
+    async function handleImage(file) {
+      rowsContainer.innerHTML = ''
+      loading.style.display = 'flex'
+      imgInput.disabled = true
+
+      const img = new Image()
+      img.src = URL.createObjectURL(file)
+      await new Promise((res) => (img.onload = res))
+
+      if (img.naturalWidth !== 3110 || img.naturalHeight % 1350 !== 0) {
+        alert(`A imagem tem de ter largura 3110px e altura múltipla de 1350px. Tamanho actual: ${img.naturalWidth}×${img.naturalHeight}`)
+        loading.style.display = 'none'
+        imgInput.disabled = false
+        return
+      }
+
+      if (worker) worker.terminate()
+      worker = new Worker('worker.js')
+
+      worker.onmessage = (e) => {
+        const data = e.data
+
+        if (data.type === 'subimage') {
+          const { thumbBase64, fullBase64, row, col } = data
+
+          const card = document.createElement('div')
+          card.className = 'card'
+
+          const thumb = document.createElement('img')
+          thumb.src = thumbBase64
+          thumb.className = 'thumb'
+
+          const hoverWrapper = document.createElement('div')
+          hoverWrapper.className = 'hover-wrapper'
+
+          const fullImg = document.createElement('img')
+          fullImg.src = fullBase64
+          fullImg.className = 'fullImg'
+
+          const overlay = document.createElement('div')
+          overlay.className = 'overlay'
+          const downloadText = document.createElement('div')
+          downloadText.className = 'download-text'
+          downloadText.textContent = 'Download'
+          overlay.appendChild(downloadText)
+
+          hoverWrapper.appendChild(fullImg)
+          hoverWrapper.appendChild(overlay)
+
+          thumb.addEventListener('click', () => {
+            const a = document.createElement('a')
+            a.href = fullBase64
+            a.download = `subimage_${row}_${col}.png`
+            a.click()
+          })
+
+          card.appendChild(thumb)
+          card.appendChild(hoverWrapper)
+          rowsContainer.appendChild(card)
+        }
+
+        if (data.type === 'done') {
+          loading.style.display = 'none'
+          imgInput.disabled = false
+        }
+      }
+
+      worker.postMessage({
+        width: img.naturalWidth,
+        height: img.naturalHeight,
+        file,
+        cols: 3,
+        cellWidth: 1080,
+        cellHeight: 1350,
+        marginHorizontal: 65,
+        cropPixels: 32.5,
+        rows: img.naturalHeight / 1350  // Calcular número de linhas baseado na altura
+      })
+    }
+
+    // Dark mode toggle functionality
+    const darkModeToggle = document.getElementById('darkModeToggle')
+    const sunIcon = document.querySelector('.sun-icon')
+    const moonIcon = document.querySelector('.moon-icon')
+
+    // Check for saved theme preference or respect OS preference
+    const currentTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+    if (currentTheme === 'dark') {
+      document.body.classList.add('dark-mode')
+      sunIcon.classList.add('hidden')
+      moonIcon.classList.remove('hidden')
+    } else {
+      sunIcon.classList.remove('hidden')
+      moonIcon.classList.add('hidden')
+    }
+
+    darkModeToggle.addEventListener('click', () => {
+      document.body.classList.toggle('dark-mode')
+
+      // Toggle icons
+      sunIcon.classList.toggle('hidden')
+      moonIcon.classList.toggle('hidden')
+
+      // Save preference to localStorage
+      if (document.body.classList.contains('dark-mode')) {
+        localStorage.setItem('theme', 'dark')
+      } else {
+        localStorage.setItem('theme', 'light')
+      }
+    })
+  </script>
+</body>
+
+</html>
