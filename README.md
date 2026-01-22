@@ -42,7 +42,7 @@ This will crop the **second row** (from bottom to top) of the image and generate
 
 ## Web Version (Browser UI)
 
-A browser-based UI available at [https://instagram-crop.web.app/](https://instagram-crop.web.app/) located in the `/web` directory.
+A browser-based UI available at [Instagram-Grid-Cropper](https://rodrig20.github.io/Instagram-Grid-Cropper/) located in the `/web` directory.
 
 ### Features
 - No installation required
